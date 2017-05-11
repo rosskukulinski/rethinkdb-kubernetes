@@ -1,8 +1,10 @@
 IMAGE=rosskukulinski/rethinkdb-kubernetes
-TAG=2.3.5-v1
+TAG=2.3.5-v2
+
+all: push
 
 probe:
-	./build-probe.sh
+	(cd ./rethinkdb-probe && ./build-probe.sh)
 
 image: probe
 	docker build -t ${IMAGE}:${TAG} .

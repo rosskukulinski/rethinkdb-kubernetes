@@ -12,7 +12,7 @@ RUN chmod +x /usr/bin/jq
 ADD https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64 /usr/local/bin/dumb-init
 RUN chmod +x /usr/local/bin/dumb-init
 
-COPY ./run.sh ./probe ./ready-probe.sh /
-RUN chmod u+x /run.sh /probe /ready-probe.sh
+COPY ./files/run.sh ./rethinkdb-probe/rethinkdb-probe /
+RUN chmod u+x /run.sh /rethinkdb-probe
 
 ENTRYPOINT ["/usr/local/bin/dumb-init", "/run.sh"]
