@@ -1,12 +1,12 @@
-HASH=`git rev-parse --short HEAD`
-IMAGE=tjmehta/rethinkdb-kubernetes
-TAG=2.4.1-$HASH
+H:=$(shell git rev-parse --short HEAD)
+I=tjmehta/rethinkdb-kubernetes
+T=2.4.1-$H
 
 build:
-	docker build ./ -t $IMAGE:$TAG
+	docker build ./ -t $I:$T
 
 build-no-cache:
-	docker build --no-cache ./ -t $IMAGE:$TAG
+	docker build --no-cache ./ -t $I:$T
 
 dev-clear-cache:
 	deno cache --unstable --reload ./findPeersSrc/findPeers.ts

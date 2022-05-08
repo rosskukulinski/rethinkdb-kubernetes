@@ -1,3 +1,4 @@
+// startup = is the pod started up and ready for traffic?
 import {
   connect,
   r,
@@ -46,4 +47,5 @@ for (const peerName in serverStatus.network.connected_to) {
 if (!connectedToPeers) {
   throw new Error("not connected to any peers");
 }
+
 console.log("connected to peers");
