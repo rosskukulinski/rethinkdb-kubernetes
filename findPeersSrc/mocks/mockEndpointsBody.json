@@ -1,0 +1,65 @@
+{
+  "kind": "Endpoints",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "rethinkdb-cluster",
+    "namespace": "default",
+    "uid": "aaaaaaaa-dddd-bbbb-cccc-123123123213",
+    "resourceVersion": "87437301",
+    "creationTimestamp": "2021-11-05T05:27:10Z",
+    "annotations": {
+      "endpoints.kubernetes.io/last-change-trigger-time": "2022-05-06T04:39:16Z"
+    }
+  },
+  "subsets": [
+    {
+      "addresses": [
+        {
+          "ip": "10.0.0.1",
+          "nodeName": "foo-node1",
+          "targetRef": {
+            "kind": "Pod",
+            "namespace": "default",
+            "name": "rethinkdb-replica-1",
+            "uid": "1aaaaaaa-dddd-bbbb-cccc-123123123213",
+            "resourceVersion": "87431189"
+          }
+        },
+        {
+          "ip": "10.0.0.2",
+          "nodeName": "foo-node2",
+          "targetRef": {
+            "kind": "Pod",
+            "namespace": "default",
+            "name": "rethinkdb-replica-3",
+            "uid": "2aaaaaaa-dddd-bbbb-cccc-123123123213",
+            "resourceVersion": "87437293"
+          }
+        },
+        {
+          "ip": "10.0.0.3",
+          "nodeName": "foo-node3",
+          "targetRef": {
+            "kind": "Pod",
+            "namespace": "default",
+            "name": "rethinkdb-replica-2",
+            "uid": "3aaaaaaa-dddd-bbbb-cccc-123123123213",
+            "resourceVersion": "87436025"
+          }
+        }
+      ],
+      "ports": [
+        {
+          "name": "cluster",
+          "port": 29015,
+          "protocol": "TCP"
+        },
+        {
+          "name": "rethinkdb",
+          "port": 28015,
+          "protocol": "TCP"
+        }
+      ]
+    }
+  ]
+}

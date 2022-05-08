@@ -31,26 +31,10 @@ echo "Using service name: ${RETHINK_CLUSTER}"
 echo "Using server name: ${SERVER_NAME}"
 
 echo "Checking for other nodes..."
-if [[ -n "${KUBERNETES_SERVICE_HOST}" && -z "${USE_SERVICE_LOOKUP}" ]]; then
-  echo "Using endpoints to lookup other nodes..."
-  URL="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${POD_NAMESPACE}/endpoints/${RETHINK_CLUSTER}"
-  echo "Endpoint url: ${URL}"
-  echo "Looking for IPs..."
-  token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-  # try to pick up first different ip from endpoints
-  IP=$(curl -s ${URL} --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer ${token}" \
-    | jq -s -r --arg h "${POD_IP}" '.[0].subsets | .[].addresses | [ .[].ip ] | map(select(. != $h)) | .[0]') || exit 1
-  [[ "${IP}" == null ]] && IP=""
-  JOIN_ENDPOINTS="${IP}"
-else
-  echo "Using service to lookup other nodes..."
-  # We can just use ${RETHINK_CLUSTER} due to dns lookup
-  # Instead though, let's be explicit:
-  JOIN_ENDPOINTS=$(getent hosts "${RETHINK_CLUSTER}.${POD_NAMESPACE}.svc.cluster.local" | awk '{print $1}')
 
-  # Let's filter out our IP address if it's in there...
-  JOIN_ENDPOINTS=$(echo ${JOIN_ENDPOINTS} | sed -e "s/${POD_IP}//g")
-fi
+JOIN_ENDPOINTS=`./findPeers`
+
+echo "findPeers: ${JOIN_ENDPOINTS}"
 
 # xargs echo removes extra spaces before/after
 # tr removes extra spaces in the middle
