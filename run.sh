@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors All rights reserved.
 #
@@ -18,53 +18,45 @@ set -o pipefail
 
 POD_NAMESPACE=${POD_NAMESPACE:-default}
 POD_IP=${POD_IP:-127.0.0.1}
-RETHINK_CLUSTER=${RETHINK_CLUSTER:-"rethinkdb"}
+RETHINKDB_CLUSTER_SERVICE=${RETHINKDB_CLUSTER_SERVICE:-"rethinkdb"}
 POD_NAME=${POD_NAME:-"NO_POD_NAME"}
+RETHINKDB_PASSWORD=${RETHINKDB_PASSWORD:-"auto"}
 
 # Transform - to _ to comply with requirements
-SERVER_NAME=$(echo ${POD_NAME} | sed 's/-/_/g')
+SERVER_NAME=${POD_NAME//-/_}
 
-echo "Using additional CLI flags: ${@}"
+echo "Using additional CLI flags: ${*}"
 echo "Pod IP: ${POD_IP}"
 echo "Pod namespace: ${POD_NAMESPACE}"
-echo "Using service name: ${RETHINK_CLUSTER}"
+echo "Using service name: ${RETHINKDB_CLUSTER_SERVICE}"
 echo "Using server name: ${SERVER_NAME}"
 
 echo "Checking for other nodes..."
-if [[ -n "${KUBERNETES_SERVICE_HOST}" && -z "${USE_SERVICE_LOOKUP}" ]]; then
+if [[ -n "${KUBERNETES_SERVICE_HOST}" ]]; then
   echo "Using endpoints to lookup other nodes..."
-  URL="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${POD_NAMESPACE}/endpoints/${RETHINK_CLUSTER}"
+  URL="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/apis/discovery.k8s.io/v1/namespaces/${POD_NAMESPACE}/endpointslices/${RETHINKDB_CLUSTER_SERVICE}"
   echo "Endpoint url: ${URL}"
   echo "Looking for IPs..."
   token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
   # try to pick up first different ip from endpoints
-  IP=$(curl -s ${URL} --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer ${token}" \
-    | jq -s -r --arg h "${POD_IP}" '.[0].subsets | .[].addresses | [ .[].ip ] | map(select(. != $h)) | .[0]') || exit 1
+  IP=$(curl -s "${URL}" --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer ${token}" \
+    | jq -s -r --arg h "${POD_IP}" '.[0].endpoints | .[].addresses | map(select(. != $h)) | .[0]') || exit 1
   [[ "${IP}" == null ]] && IP=""
   JOIN_ENDPOINTS="${IP}"
-else
-  echo "Using service to lookup other nodes..."
-  # We can just use ${RETHINK_CLUSTER} due to dns lookup
-  # Instead though, let's be explicit:
-  JOIN_ENDPOINTS=$(getent hosts "${RETHINK_CLUSTER}.${POD_NAMESPACE}.svc.cluster.local" | awk '{print $1}')
-
-  # Let's filter out our IP address if it's in there...
-  JOIN_ENDPOINTS=$(echo ${JOIN_ENDPOINTS} | sed -e "s/${POD_IP}//g")
 fi
 
-# xargs echo removes extra spaces before/after
-# tr removes extra spaces in the middle
-JOIN_ENDPOINTS=$(echo ${JOIN_ENDPOINTS} | xargs echo | tr -s ' ')
+# xargs echo removes extra spaces before, after and between
+JOIN_ENDPOINTS=$(echo "${JOIN_ENDPOINTS}" | xargs)
 
 if [ -n "${JOIN_ENDPOINTS}" ]; then
   echo "Found other nodes: ${JOIN_ENDPOINTS}"
 
   # Now, transform join endpoints into --join ENDPOINT:29015
   # Put port after each
-  JOIN_ENDPOINTS=$(echo ${JOIN_ENDPOINTS} | sed -r 's/([0-9.])+/&:29015/g')
+  JOIN_ENDPOINTS=$(echo "${JOIN_ENDPOINTS}" | sed -r 's/([0-9.])+/&:29015/g')
 
   # Put --join before each
-  JOIN_ENDPOINTS=$(echo ${JOIN_ENDPOINTS} | sed -e 's/^\|[ ]/&--join /g')
+  JOIN_ENDPOINTS=$(echo "${JOIN_ENDPOINTS}" | sed -e 's/^\|[ ]/&--join /g')
 else
   echo "No other nodes detected, will be a single instance."
   if [ -n "$PROXY" ]; then
@@ -73,21 +65,21 @@ else
   fi
 fi
 
-if [[ -n "${PROXY}" ]]; then
+if [ -n "${PROXY}" ]; then
   echo "Starting in proxy mode"
   set -x
   exec rethinkdb \
     proxy \
-    --canonical-address ${POD_IP} \
-    --bind all \
+    --canonical-address "${POD_IP}" \
+    --initial-password "${RETHINKDB_PASSWORD}" \
     ${JOIN_ENDPOINTS} \
-    ${@}
+    "${@}"
 else
   set -x
   exec rethinkdb \
-    --server-name ${SERVER_NAME} \
-    --canonical-address ${POD_IP} \
-    --bind all \
+    --server-name "${SERVER_NAME}" \
+    --canonical-address "${POD_IP}" \
+    --initial-password "${RETHINKDB_PASSWORD}" \
     ${JOIN_ENDPOINTS} \
-    ${@}
+    "${@}"
 fi
