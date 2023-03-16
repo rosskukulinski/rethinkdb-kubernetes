@@ -1,9 +1,12 @@
 FROM golang:1.19-alpine as probe
 
 WORKDIR /go/src/probe
+
 COPY go.mod go.sum ./
 RUN go mod download
+
 COPY probe.go .
+
 RUN CGO_ENABLED=0 go install -trimpath -ldflags "-s -w"
 
 
