@@ -1,40 +1,49 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"os"
-	r "gopkg.in/gorethink/gorethink.v2"
+
+	r "gopkg.in/rethinkdb/rethinkdb-go.v6"
 )
 
-
 func main() {
-
 	url := os.Getenv("RETHINKDB_URL")
+	password := os.Getenv("RETHINKDB_PASSWORD")
 
 	if url == "" {
 		url = "localhost:28015"
 	}
 
-	session, err := r.Connect(r.ConnectOpts{
-		Address: url,
+	err := probe(r.ConnectOpts{
+		Address:  url,
 		Database: "rethinkdb",
+		Username: "admin",
+		Password: password,
 	})
-
 	if err != nil {
-		log.Fatalln(err.Error())
+		log.Print(err)
+		os.Exit(1)
 	}
+}
+
+func probe(opts r.ConnectOpts) error {
+	session, err := r.Connect(opts)
+	if err != nil {
+		return err
+	}
+	defer session.Close()
 
 	res, err := r.Table("server_status").Pluck("id", "name").Run(session)
 	if err != nil {
-		log.Fatalln(err.Error())
+		return err
 	}
 	defer res.Close()
 
 	if res.IsNil() {
-		log.Fatalln("no server status results found")
+		return errors.New("no server status results found")
 	}
 
-	log.Printf("A-OK!")
-
+	return nil
 }
-
