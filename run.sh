@@ -18,7 +18,7 @@ set -o pipefail
 
 POD_NAMESPACE=${POD_NAMESPACE:-default}
 POD_IP=${POD_IP:-127.0.0.1}
-RETHINKDB_CLUSTER_SERVICE=${RETHINKDB_CLUSTER_SERVICE:-"rethinkdb"}
+RETHINKDB_CLUSTER_LABEL_SELECTOR=${RETHINKDB_CLUSTER_LABEL_SELECTOR:-"app.kubernetes.io/name=rethinkdb"}
 POD_NAME=${POD_NAME:-"NO_POD_NAME"}
 RETHINKDB_PASSWORD=${RETHINKDB_PASSWORD:-"auto"}
 
@@ -28,28 +28,22 @@ SERVER_NAME=${POD_NAME//-/_}
 echo "Using additional CLI flags: ${*}"
 echo "Pod IP: ${POD_IP}"
 echo "Pod namespace: ${POD_NAMESPACE}"
-echo "Using service name: ${RETHINKDB_CLUSTER_SERVICE}"
 echo "Using server name: ${SERVER_NAME}"
 
 echo "Checking for other nodes..."
-if [[ -n "${KUBERNETES_SERVICE_HOST}" ]]; then
-  echo "Using endpoints to lookup other nodes..."
-  URL="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${POD_NAMESPACE}/endpoints/${RETHINKDB_CLUSTER_SERVICE}"
+if [[ -n "${KUBERNETES_SERVICE_HOST}" && -n ${KUBERNETES_SERVICE_PORT} ]]; then
+  echo "Using kubernetes discovery API to lookup other nodes..."
+  URL="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/apis/discovery.k8s.io/v1/namespaces/${POD_NAMESPACE}/endpointslices?labelSelector=${RETHINKDB_CLUSTER_LABEL_SELECTOR}"
   echo "Endpoint url: ${URL}"
   echo "Looking for IPs..."
   token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-
-  # try to pick up first different ip from endpoints
-  IP=$(curl -s "${URL}" --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer ${token}" \
-    | jq -s -r --arg h "${POD_IP}" '.[0].subsets | .[].addresses | [ .[].ip ] | map(select(. != $h)) | .[0]') || exit 1
-  [[ "${IP}" == null ]] && IP="" 
-  JOIN_ENDPOINTS="${IP}"
+  IPS=$(curl -s "${URL}" --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer ${token}" \
+    | jq -r --arg h "${POD_IP}" '.items[].endpoints[] | if .conditions.serving then select(.conditions.serving | contains(true)) else empty end | .addresses[] | select(. != $h)') || exit 1
+  # xargs removes extra spaces before, after and between
+  JOIN_ENDPOINTS=$(echo "${IPS}" | xargs)
 fi
 
-# xargs echo removes extra spaces before, after and between
-JOIN_ENDPOINTS=$(echo "${JOIN_ENDPOINTS}" | xargs)
-
-if [ -n "${JOIN_ENDPOINTS}" ]; then
+if [[ -n "${JOIN_ENDPOINTS}" ]]; then
   echo "Found other nodes: ${JOIN_ENDPOINTS}"
 
   # Now, transform join endpoints into --join ENDPOINT:29015
@@ -60,13 +54,13 @@ if [ -n "${JOIN_ENDPOINTS}" ]; then
   JOIN_ENDPOINTS=$(echo "${JOIN_ENDPOINTS}" | sed -e 's/^\|[ ]/&--join /g')
 else
   echo "No other nodes detected, will be a single instance."
-  if [ -n "$PROXY" ]; then
+  if [[ -n "$PROXY" ]]; then
     echo "Cannot start in proxy mode without endpoints."
     exit 1
   fi
 fi
 
-if [ -n "${PROXY}" ]; then
+if [[ -n "${PROXY}" ]]; then
   echo "Starting in proxy mode"
   set -x
   exec rethinkdb \
