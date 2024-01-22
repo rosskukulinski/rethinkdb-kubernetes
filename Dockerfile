@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 go install -trimpath -ldflags "-s -w"
 
 FROM rethinkdb:2.4.2-bullseye-slim
 
-MAINTAINER Marius André Elsfjordstrand Beck <marius.beck@nb.no>
+LABEL maintainer="Marius André Elsfjordstrand Beck <marius.beck@nb.no>"
 
 RUN apt-get update && \
     apt-get install -yq curl && \
