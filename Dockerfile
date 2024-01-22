@@ -1,4 +1,4 @@
-FROM golang:1.19-alpine as probe
+FROM golang:1.20-bookworm as probe
 
 WORKDIR /go/src/probe
 
@@ -10,7 +10,7 @@ COPY probe.go .
 RUN CGO_ENABLED=0 go install -trimpath -ldflags "-s -w"
 
 
-FROM rethinkdb:2.4.2-bullseye-slim
+FROM rethinkdb:2.4.4-bookworm-slim
 
 LABEL maintainer="Marius André Elsfjordstrand Beck <marius.beck@nb.no>"
 
